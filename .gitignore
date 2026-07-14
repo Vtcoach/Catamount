@@ -1,0 +1,15 @@
+# Browser profiles
+chrome-debug/
+chrome_debug_profile/
+playwright_profile/
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Virtual environments
+.venv/
+venv/
+
+# VS Code settings
+.vscode/
