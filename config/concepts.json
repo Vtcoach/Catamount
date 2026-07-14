@@ -1,0 +1,67 @@
+{
+  "concepts": {
+    "Primary Operational Reference": {
+      "labels": [
+        "PO#",
+        "PO Number",
+        "Order",
+        "Order #",
+        "Load Number",
+        "Load #",
+        "Load ID",
+        "Shipment #",
+        "Shipment Number",
+        "Reference",
+        "REF#",
+        "Freight Bill #",
+        "Route #",
+        "Route Number",
+        "TA#",
+        "MCL PO#"
+      ]
+    },
+
+    "Revenue": {
+      "labels": [
+        "Total",
+        "Total Rate",
+        "Total Carrier Pay",
+        "Carrier Freight Pay",
+        "Rate",
+        "Total Pay",
+        "Grand Total",
+        "Estimated Award Amount",
+        "Net Freight Charges"
+      ]
+    },
+  "Weight": {
+    "labels": [
+    "Estimated Weight",
+    "Weight",
+    "Total Weight",
+    "Total Weight (lbs.)",
+    "Weight (lbs)"
+     ]
+    },
+  "Pickup": {
+    "labels": [
+    "Pick-up Location",
+    "Pickup Location",
+    "Pickup",
+    "Origin",
+    "Ship From",
+    "Shipper"
+     ]
+    },
+  "Delivery": {
+    "labels": [
+    "Delivery Location",
+    "Delivery",
+    "Destination",
+    "Deliver To",
+    "Receiver",
+    "Consignee"
+     ]
+    }
+   }
+  }   

@@ -1,0 +1,85 @@
+{
+  "brokers": [
+    {
+      "id": "TQL",
+      "name": "Total Quality Logistics",
+      "bill_to_code": "TOTMIOHB",
+      "aliases": [
+        "TQL",
+        "TOTAL QUALITY LOGISTICS"
+      ],
+      "workflow": {
+        "requires_supporting_document": true,
+        "supporting_document_name": "Driver Sheet"
+      },
+      "field_sources": {
+        "pickup_address": "supporting_document",
+        "delivery_address": "supporting_document",
+        "appointment": "supporting_document",
+        "revenue": "rate_confirmation"
+      }
+    },
+    {
+      "id": "SPOT",
+      "name": "Spot Freight Inc",
+      "bill_to_code": "SPOININB",
+      "aliases": [
+        "SPOT FREIGHT",
+        "SPOT FREIGHT INC"
+      ],
+      "workflow": {
+        "requires_supporting_document": false,
+        "supporting_document_name": ""
+      },
+      "field_sources": {
+        "pickup_address": "rate_confirmation",
+        "delivery_address": "rate_confirmation",
+        "appointment": "rate_confirmation",
+        "revenue": "rate_confirmation"
+      }
+    },
+    {
+      "id": "HUB",
+      "name": "Hub Group",
+      "bill_to_code": "HUGDGILB",
+      "aliases": [
+        "HUB GROUP",
+        "HUB GROUP INC",
+        "HUB GROUP, INC"
+      ],
+      "workflow": {
+        "requires_supporting_document": false,
+        "supporting_document_name": ""
+      },
+      "field_sources": {
+        "pickup_address": "rate_confirmation",
+        "delivery_address": "rate_confirmation",
+        "appointment": "rate_confirmation",
+        "revenue": "rate_confirmation"
+      }
+    },
+    {
+      "id": "ARMSTRONG",
+      "name": "Armstrong Transport Group",
+      "bill_to_code": "ATGCONCB",
+      "aliases": [
+        "ARMSTRONG TRANSPORT GROUP",
+        "ARMSTRONG TRANSPORT GROUP, LLC",
+        "ARMSTRONG"
+      ],
+      "workflow": {
+        "requires_supporting_document": false,
+        "supporting_document_name": ""
+            },
+      "field_sources": {
+        "pickup_address": "rate_confirmation",
+        "delivery_address": "rate_confirmation",
+        "appointment": "rate_confirmation",
+        "revenue": "rate_confirmation"
+      }
+    }
+  ]
+}
+
+
+  
