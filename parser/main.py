@@ -646,19 +646,27 @@ def extract_ryan_stop_data(text):
         block = text[stop_match.start():next_stop_start]
         result = empty_stop()
 
+        def clean_stop_value(value):
+            return clean_name_line(re.sub(
+                r"\s+(?:Date\s*:\s*)?\d{1,2}/\d{1,2}/\d{4}\s+\d{3,4}\b.*$",
+                "",
+                value,
+                flags=re.IGNORECASE
+            ))
+
         name_match = re.search(
             r"(?im)\bName\s*:\s*(.+?)(?:\s{2,}Date\s*:|$)",
             block
         )
         if name_match:
-            result["name"] = clean_name_line(name_match.group(1))
+            result["name"] = clean_stop_value(name_match.group(1))
 
         address_match = re.search(r"(?im)^\s*Address\s*:\s*(.+)$", block)
         if address_match:
-            result["address"] = clean_name_line(address_match.group(1))
+            result["address"] = clean_stop_value(address_match.group(1))
 
         city_match = re.search(
-            r"(?im)^\s*([A-Za-z .'-]+?)\s+([A-Z]{2})\s+\d{5}(?:-\d{4})?\s*$",
+            r"(?im)^\s*([A-Za-z .'-]+?)\s+([A-Z]{2})\s+\d{5}(?:-\d{4})?(?:[ \t]+.*)?$",
             block
         )
         if city_match:
