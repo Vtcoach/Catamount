@@ -77,6 +77,26 @@
         "appointment": "rate_confirmation",
         "revenue": "rate_confirmation"
       }
+    },
+    {
+      "id": "RYAN",
+      "name": "Ryan Transportation Service, Inc.",
+      "bill_to_code": "RYASHKS",
+      "aliases": [
+        "RYAN TRANSPORTATION SERVICE, INC",
+        "RYAN TRANSPORTATION",
+        "RYANTRANS.COM"
+      ],
+      "workflow": {
+        "requires_supporting_document": false,
+        "supporting_document_name": ""
+      },
+      "field_sources": {
+        "pickup_address": "rate_confirmation",
+        "delivery_address": "rate_confirmation",
+        "appointment": "rate_confirmation",
+        "revenue": "rate_confirmation"
+      }
     }
   ]
 }

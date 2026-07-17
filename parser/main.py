@@ -3,6 +3,8 @@ import json
 import os
 import fitz
 import re
+import importlib.util
+import io
 from tkinter import Tk
 from tkinter.filedialog import askopenfilename
 from diagnostics import run_diagnostics
@@ -35,6 +37,54 @@ def load_concepts():
         return json.load(f)
 
 
+def read_scanned_pdf(pdf_file):
+    """OCR a scanned PDF only when native PDF text is unavailable.
+
+    On Windows, Tesseract must be available on PATH unless a future
+    application configuration sets pytesseract.pytesseract.tesseract_cmd.
+    """
+    if (
+        importlib.util.find_spec("pytesseract") is None
+        or importlib.util.find_spec("PIL") is None
+    ):
+        print(
+            "WARNING: Native PDF text is insufficient and OCR is unavailable. "
+            "Install pytesseract, Pillow, and the Tesseract executable."
+        )
+        return ""
+
+    import pytesseract
+    from PIL import Image
+
+    try:
+        pytesseract.get_tesseract_version()
+    except pytesseract.TesseractNotFoundError:
+        print(
+            "WARNING: Native PDF text is insufficient and the Tesseract "
+            "executable is unavailable. Install Tesseract to OCR this file."
+        )
+        return ""
+
+    doc = fitz.open(pdf_file)
+    pages = []
+
+    try:
+        for page_number, page in enumerate(doc, start=1):
+            try:
+                pixmap = page.get_pixmap(matrix=fitz.Matrix(3, 3), alpha=False)
+                image = Image.open(io.BytesIO(pixmap.tobytes("png")))
+                pages.append(pytesseract.image_to_string(image))
+            except Exception as error:
+                print(f"WARNING: OCR failed on page {page_number}: {error}")
+    except Exception as error:
+        print(f"WARNING: Unable to render scanned PDF for OCR: {error}")
+        return ""
+    finally:
+        doc.close()
+
+    return "\n".join(pages)
+
+
 def read_pdf(pdf_file):
     doc = fitz.open(pdf_file)
     text = ""
@@ -43,6 +93,10 @@ def read_pdf(pdf_file):
         text += page.get_text()
 
     doc.close()
+
+    if len(text.strip()) < 40:
+        return read_scanned_pdf(pdf_file)
+
     return text
 
 
@@ -576,6 +630,103 @@ def extract_armstrong_delivery_appointment(text):
     }
 
 
+def extract_ryan_stop_data(text):
+    stop_pattern = re.compile(r"(?im)^\s*(PU|SO)\s*\d+\b")
+    stops = list(stop_pattern.finditer(text))
+
+    def empty_stop():
+        return {
+            "name": "UNKNOWN",
+            "address": "UNKNOWN",
+            "city_state": "UNKNOWN",
+            "appointment": {"date": "UNKNOWN", "time": "UNKNOWN"}
+        }
+
+    def parse_stop(stop_match, next_stop_start):
+        block = text[stop_match.start():next_stop_start]
+        result = empty_stop()
+
+        name_match = re.search(
+            r"(?im)\bName\s*:\s*(.+?)(?:\s{2,}Date\s*:|$)",
+            block
+        )
+        if name_match:
+            result["name"] = clean_name_line(name_match.group(1))
+
+        address_match = re.search(r"(?im)^\s*Address\s*:\s*(.+)$", block)
+        if address_match:
+            result["address"] = clean_name_line(address_match.group(1))
+
+        city_match = re.search(
+            r"(?im)^\s*([A-Za-z .'-]+?)\s+([A-Z]{2})\s+\d{5}(?:-\d{4})?\s*$",
+            block
+        )
+        if city_match:
+            city = clean_name_line(city_match.group(1)).title()
+            result["city_state"] = f"{city}, {city_match.group(2).upper()}"
+
+        appointment_match = re.search(
+            r"(?i)Date\s*:\s*(\d{1,2})/(\d{1,2})/(\d{4})\s+(\d{3,4})",
+            block
+        )
+        if appointment_match:
+            month, day, year, time = appointment_match.groups()
+            result["appointment"] = {
+                "date": f"{int(month):02d}{int(day):02d}{year}",
+                "time": time.zfill(4)
+            }
+
+        return result
+
+    pickup_stop = empty_stop()
+    delivery_stop = empty_stop()
+
+    for index, stop_match in enumerate(stops):
+        next_stop_start = (
+            stops[index + 1].start()
+            if index + 1 < len(stops)
+            else len(text)
+        )
+        parsed_stop = parse_stop(stop_match, next_stop_start)
+
+        if stop_match.group(1).upper() == "PU":
+            pickup_stop = parsed_stop
+        elif stop_match.group(1).upper() == "SO":
+            delivery_stop = parsed_stop
+
+    return {
+        "pickup_name": pickup_stop["name"],
+        "pickup_address": pickup_stop["address"],
+        "pickup": pickup_stop["city_state"],
+        "delivery_name": delivery_stop["name"],
+        "delivery_address": delivery_stop["address"],
+        "delivery": delivery_stop["city_state"],
+        "delivery_appointment": delivery_stop["appointment"]
+    }
+
+
+def extract_ryan_load_number(text):
+    match = re.search(r"LOAD\s*#\s*:\s*(\d+)", text, re.IGNORECASE)
+
+    if match:
+        return match.group(1)
+
+    return "UNKNOWN"
+
+
+def extract_ryan_revenue(text):
+    match = re.search(
+        r"Total\s+Carrier\s+Pay\s*:\s*\$?([0-9,]+\.[0-9]{2})",
+        text,
+        re.IGNORECASE
+    )
+
+    if match:
+        return match.group(1)
+
+    return "UNKNOWN"
+
+
 
 def extract_information_addresses(text):
     lines = [
@@ -690,8 +841,8 @@ pickup_address = "UNKNOWN"
 delivery_address = "UNKNOWN"
 
 delivery_appointment = {
-    "date": "07072026",
-    "time": "0830"
+    "date": "UNKNOWN",
+    "time": "UNKNOWN"
 }
 
 broker_id = broker_profile.get("id", "")
@@ -724,6 +875,20 @@ elif broker_id == "HUB":
 elif broker_id == "ARMSTRONG":
     stop_data = extract_armstrong_stop_data(rate_text)
     delivery_appointment = extract_armstrong_delivery_appointment(rate_text)
+
+    pickup_name = stop_data["pickup_name"]
+    pickup_address = stop_data["pickup_address"]
+    pickup = stop_data["pickup"]
+
+    delivery_name = stop_data["delivery_name"]
+    delivery_address = stop_data["delivery_address"]
+    delivery = stop_data["delivery"]
+
+elif broker_id == "RYAN":
+    stop_data = extract_ryan_stop_data(rate_text)
+    load_number = extract_ryan_load_number(rate_text)
+    revenue = extract_ryan_revenue(rate_text)
+    delivery_appointment = stop_data["delivery_appointment"]
 
     pickup_name = stop_data["pickup_name"]
     pickup_address = stop_data["pickup_address"]
