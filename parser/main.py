@@ -156,67 +156,141 @@ def extract_tql_stop_data(text):
     delivery_name = "UNKNOWN"
     pickup_address = "UNKNOWN"
     delivery_address = "UNKNOWN"
+    pickup = "UNKNOWN"
+    delivery = "UNKNOWN"
 
-    pickup_section_index = None
+    def find_city_state_zip(start, end):
+        for index in range(start, end - 1):
+            state_zip = re.fullmatch(r"([A-Z]{2})\s+(\d{5}(?:-\d{4})?)", lines[index + 1])
+            city_state_zip = re.fullmatch(
+                r"(.+?)\s+([A-Z]{2})\s+(\d{5}(?:-\d{4})?)",
+                lines[index]
+            )
+            city_state = re.fullmatch(r"(.+?)\s+([A-Z]{2})", lines[index])
 
-    for index, line in enumerate(lines):
-        upper_line = line.upper()
+            if state_zip and re.fullmatch(r"[A-Za-z .'-]+", lines[index]):
+                return index, lines[index], state_zip.group(1)
 
-        if upper_line == "PICKUPS":
-            pickup_section_index = index
+            if (
+                re.fullmatch(r"[A-Za-z .'-]+", lines[index])
+                and index + 2 < end
+                and re.fullmatch(r"[A-Z]{2}", lines[index + 1])
+                and re.fullmatch(r"\d{5}(?:-\d{4})?", lines[index + 2])
+            ):
+                return index, lines[index], lines[index + 1]
+
+            if city_state_zip:
+                return index, city_state_zip.group(1), city_state_zip.group(2)
+
+            if (
+                city_state
+                and index + 1 < end
+                and re.fullmatch(r"\d{5}(?:-\d{4})?", lines[index + 1])
+            ):
+                return index, city_state.group(1), city_state.group(2)
+
+        return None
+
+    def extract_address(information_index, end):
+        city_data = find_city_state_zip(information_index + 1, end)
+
+        if not city_data:
+            return "UNKNOWN"
+
+        city_index, _, _ = city_data
+        address_lines = lines[information_index + 1:city_index]
+        number_index = next(
+            (index for index, line in enumerate(address_lines)
+             if re.match(r"^\d+", line)),
+            None
+        )
+
+        if number_index is None:
+            return "UNKNOWN"
+
+        return clean_name_line(" ".join(address_lines[number_index:]))
+
+    def find_last_city_state_zip(start, end):
+        city_data = None
+
+        for index in range(start, end):
+            candidate = find_city_state_zip(index, end)
+            if candidate and candidate[0] == index:
+                city_data = candidate
+
+        return city_data
+
+    pickup_section_index = next(
+        (index for index, line in enumerate(lines) if line.upper() == "PICKUPS"),
+        None
+    )
+    consignee_index = next(
+        (index for index, line in enumerate(lines) if line.upper() == "CONSIGNEE"),
+        len(lines)
+    )
+    drops_index = next(
+        (index for index, line in enumerate(lines) if line.upper() == "DROPS"),
+        len(lines)
+    )
 
     if pickup_section_index is not None:
-        for index in range(pickup_section_index + 1, len(lines)):
-            line = lines[index]
-            upper_line = line.upper()
+        pickup_city_data = find_city_state_zip(
+            pickup_section_index + 1,
+            consignee_index
+        )
 
-            if upper_line in ["SHED", "CITY", "STATE ZIP", "PU#", "DATE", "TIME"]:
-                continue
+        if pickup_city_data:
+            city_index, city, state = pickup_city_data
+            pickup_name = clean_name_line(lines[city_index - 2])
+            pickup = f"{city.title()}, {state}"
 
-            pickup_name = clean_name_line(line)
-            break
+    delivery_stops = []
 
-    for index, line in enumerate(lines):
-        if line.upper() == "CONSIGNEE":
-            delivery_parts = []
+    for index in range(consignee_index + 1, drops_index):
+        if lines[index].upper() != "INFORMATION:":
+            continue
 
-            for nearby in lines[index + 1:index + 6]:
-                upper_nearby = nearby.upper()
+        city_data = find_last_city_state_zip(consignee_index + 1, index)
+        if not city_data:
+            continue
 
-                if upper_nearby in ["CITY", "STATE ZIP", "DELIVERY PO", "DATE", "TIME"]:
-                    continue
+        city_index, city, state = city_data
+        stop_name = lines[city_index - 1]
+        if stop_name.startswith("(") and city_index >= 2:
+            stop_name = lines[city_index - 2]
+        stop_name = stop_name.split("(", 1)[0]
 
-                if re.search(r"\d", nearby):
-                    break
+        delivery_stops.append({
+            "name": clean_name_line(stop_name),
+            "address": extract_address(index, drops_index),
+            "city": f"{city.title()}, {state}"
+        })
 
-                delivery_parts.append(nearby)
+    information_indexes = [
+        index
+        for index, line in enumerate(lines[:consignee_index])
+        if line.upper() == "INFORMATION:"
+    ]
 
-            if delivery_parts:
-                delivery_name = clean_name_line(" ".join(delivery_parts))
+    if information_indexes:
+        pickup_address = extract_address(
+            information_indexes[0],
+            consignee_index
+        )
 
-            break
-
-    information_addresses = []
-
-    for index, line in enumerate(lines):
-        if line.upper() == "INFORMATION:":
-            if index + 1 < len(lines):
-                address = lines[index + 1].strip()
-
-                if re.search(r"\d+\s+[A-Za-z0-9 .'-]+", address):
-                    information_addresses.append(address)
-
-    if len(information_addresses) >= 1:
-        pickup_address = information_addresses[0]
-
-    if len(information_addresses) >= 2:
-        delivery_address = information_addresses[-1]
+    if delivery_stops:
+        delivery_stop = delivery_stops[-1]
+        delivery_name = delivery_stop["name"]
+        delivery_address = delivery_stop["address"]
+        delivery = delivery_stop["city"]
 
     return {
         "pickup_name": pickup_name,
         "pickup_address": pickup_address,
+        "pickup": pickup,
         "delivery_name": delivery_name,
-        "delivery_address": delivery_address
+        "delivery_address": delivery_address,
+        "delivery": delivery
     }
 
 
@@ -629,6 +703,8 @@ if requires_supporting_document and broker_id == "TQL":
     delivery_name = stop_data["delivery_name"]
     pickup_address = stop_data["pickup_address"]
     delivery_address = stop_data["delivery_address"]
+    pickup = stop_data["pickup"]
+    delivery = stop_data["delivery"]
 
 elif broker_id == "HUB":
     stop_data = extract_hub_stop_data(rate_text)
